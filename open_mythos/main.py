@@ -154,19 +154,17 @@ def apply_rope(x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
 
     Args:
         x         -- tensor of shape (B, T, H, head_dim); head_dim must be even
-        freqs_cis -- precomputed complex frequencies of shape (T, head_dim//2),
-                     already sliced to exactly the positions being processed
-                     (caller is responsible for correct start_pos offset)
+        freqs_cis -- precomputed complex frequencies of shape (S, head_dim//2)
+                     with S >= T; only the first T rows are used, so the
+                     caller is still responsible for correct start_pos offset
+                     (e.g. passing freqs_cis[start_pos : start_pos + T])
 
     Returns:
         Rotated tensor of the same shape and dtype as x
     """
     xc = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
-    return (
-        torch.view_as_real(xc * freqs_cis.unsqueeze(0).unsqueeze(2))
-        .flatten(-2)
-        .to(x.dtype)
-    )
+    freqs_cis = freqs_cis[: x.shape[1]].unsqueeze(0).unsqueeze(2)
+    return torch.view_as_real(xc * freqs_cis).flatten(-2).to(x.dtype)
 
 
 # ---------------------------------------------------------------------------
@@ -722,7 +720,11 @@ class LTIInjection(nn.Module):
         # Compute in log space to avoid 0 * inf = NaN when log_dt → -∞, log_A → +∞.
         # dt * A_c = -exp(log_dt) * exp(log_A) = -exp(log_dt + log_A)
         # Clamp keeps the product finite in float32 for any gradient step size.
-        return torch.exp(-torch.exp((self.log_dt + self.log_A).clamp(-20, 20)))
+        # Lower bound is -15 (not -20): exp(-20) ≈ 2e-9 is below float32's ULP
+        # near 1.0 (≈6e-8), so exp(-exp(x)) would round to exactly 1.0 and
+        # violate the strict ρ(A) < 1 guarantee; exp(-15) ≈ 3e-7 keeps a safe
+        # margin above that threshold.
+        return torch.exp(-torch.exp((self.log_dt + self.log_A).clamp(-15, 20)))
 
     def forward(
         self, h: torch.Tensor, e: torch.Tensor, transformer_out: torch.Tensor

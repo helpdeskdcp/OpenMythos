@@ -68,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--gen-max-new-tokens", type=int, default=60)
     p.add_argument("--save-checkpoint", default="")
+    p.add_argument(
+        "--resume-checkpoint",
+        default="",
+        help="load this state_dict before training (continue a previous smoke run)",
+    )
     return p.parse_args()
 
 
@@ -92,6 +97,11 @@ def main() -> None:
     total = sum(p.numel() for p in model.parameters())
     non_embed = total - model.embed.weight.numel()
     print(f"[setup] params total={total:,}  non_embed={non_embed:,}")
+
+    if args.resume_checkpoint:
+        state = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
+        model.load_state_dict(state, strict=True)
+        print(f"[setup] resumed weights from {args.resume_checkpoint}")
 
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
 

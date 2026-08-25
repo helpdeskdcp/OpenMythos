@@ -3,7 +3,7 @@ import os
 import pytest
 import torch
 
-from open_mythos import OpenMythos, load_mythos_100m, mythos_100m
+from open_mythos import OpenMythos, load_mythos_100m, mythos_100m, mythos_100m_v2
 
 CHECKPOINT_PATH = "/root/openmythos/models/100m/mythos_100m_mixed_80k.pt"
 
@@ -69,6 +69,29 @@ def test_mythos_100m_state_dict_matches_checkpoint_tensor_shapes():
         assert tuple(state[name].shape) == shape, (
             f"{name}: expected {shape}, got {tuple(state[name].shape)}"
         )
+
+
+def test_mythos_100m_v2_grows_non_embedding_core():
+    """v2 keeps the same vocab/attention skeleton but a much larger MoE core,
+    and is intentionally NOT checkpoint-compatible with mythos_100m()."""
+    cfg = mythos_100m_v2()
+    assert cfg.vocab_size == 199998
+    assert cfg.attn_type == "gqa"
+    assert cfg.n_experts == 8
+    assert cfg.expert_dim == 4096
+
+    model = OpenMythos(cfg)
+    total = sum(p.numel() for p in model.parameters())
+    non_embed = total - model.embed.weight.numel()
+    assert total == 173_455_906
+    assert non_embed == 71_056_930
+
+    input_ids = torch.randint(0, cfg.vocab_size, (1, 8))
+    with torch.no_grad():
+        logits = model(input_ids, n_loops=cfg.max_loop_iters)
+    assert logits.shape == (1, 8, cfg.vocab_size)
+    assert not torch.isnan(logits).any()
+    assert not torch.isinf(logits).any()
 
 
 @pytest.mark.skipif(

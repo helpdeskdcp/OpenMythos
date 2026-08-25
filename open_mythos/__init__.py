@@ -19,6 +19,7 @@ from open_mythos.checkpoints import load_mythos_100m
 from open_mythos.tokenizer import MythosTokenizer
 from open_mythos.variants import (
     mythos_100m,
+    mythos_100m_v2,
     mythos_1b,
     mythos_1t,
     mythos_3b,
@@ -45,6 +46,7 @@ __all__ = [
     "apply_rope",
     "loop_index_embedding",
     "mythos_100m",
+    "mythos_100m_v2",
     "mythos_1b",
     "mythos_3b",
     "mythos_10b",

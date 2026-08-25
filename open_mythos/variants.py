@@ -6,6 +6,36 @@ from open_mythos.main import MythosConfig
 # expert_dim is solved from the residual budget after all other terms.
 
 
+def mythos_100m() -> MythosConfig:
+    """100M parameter config. GQA attention (not MLA), 256 context, 4 loop iters.
+
+    Matches the released ``mythos_100m_mixed_80k.pt`` checkpoint tensor-for-tensor
+    (wq/wk/wv/wo GQA attention rather than the MLA q_down/q_up/kv_down/kv_up path
+    used by every other variant in this file). qk_rope_head_dim=32 is required
+    even though MLA is unused here: it sizes the freqs_cis_mla buffer, which is
+    still part of the checkpoint's state_dict.
+    """
+    return MythosConfig(
+        vocab_size=199998,
+        dim=512,
+        n_heads=8,
+        n_kv_heads=4,
+        max_seq_len=256,
+        max_loop_iters=4,
+        prelude_layers=2,
+        coda_layers=2,
+        attn_type="gqa",
+        qk_rope_head_dim=32,
+        n_experts=4,
+        n_shared_experts=1,
+        n_experts_per_tok=2,
+        expert_dim=256,
+        act_threshold=0.99,
+        rope_theta=500000.0,
+        lora_rank=8,
+    )
+
+
 def mythos_1b() -> MythosConfig:
     """1B parameter config. Small research/fine-tuning model. dim=2048, 64 experts, 16 loop iters, 4k context."""
     return MythosConfig(

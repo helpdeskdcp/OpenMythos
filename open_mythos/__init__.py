@@ -15,8 +15,10 @@ from open_mythos.main import (
     loop_index_embedding,
     precompute_rope_freqs,
 )
+from open_mythos.checkpoints import load_mythos_100m
 from open_mythos.tokenizer import MythosTokenizer
 from open_mythos.variants import (
+    mythos_100m,
     mythos_1b,
     mythos_1t,
     mythos_3b,
@@ -42,6 +44,7 @@ __all__ = [
     "precompute_rope_freqs",
     "apply_rope",
     "loop_index_embedding",
+    "mythos_100m",
     "mythos_1b",
     "mythos_3b",
     "mythos_10b",
@@ -49,7 +52,6 @@ __all__ = [
     "mythos_100b",
     "mythos_500b",
     "mythos_1t",
-    "load_tokenizer",
-    "get_vocab_size",
+    "load_mythos_100m",
     "MythosTokenizer",
 ]

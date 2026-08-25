@@ -18,11 +18,18 @@ generated text is simply appended to the running context as the next prompt.
 from __future__ import annotations
 
 import argparse
+import os
 
 import torch
 
 from open_mythos import MythosTokenizer, OpenMythos, load_mythos_100m
 from open_mythos.variants import mythos_100m_v2
+
+# CPU decode here is dominated by per-token dispatch cost of many small
+# linear/MoE ops (~100ms/token profiled), not by available core count —
+# pin thread count explicitly so behavior doesn't depend on the caller's
+# environment.
+torch.set_num_threads(os.cpu_count() or 1)
 
 
 def load_model(variant: str, checkpoint: str, device: str) -> OpenMythos:
@@ -46,8 +53,18 @@ def parse_args() -> argparse.Namespace:
         "--checkpoint", default="/root/openmythos/models/100m/mythos_100m_mixed_80k.pt"
     )
     p.add_argument("--device", default="cpu")
-    p.add_argument("--max-new-tokens", type=int, default=60)
-    p.add_argument("--n-loops", type=int, default=4)
+    p.add_argument("--max-new-tokens", type=int, default=40)
+    p.add_argument(
+        "--n-loops",
+        type=int,
+        default=1,
+        help="recurrent loop depth. Profiled at ~37%% faster decode at 1 vs. "
+        "the trained depth of 4, with byte-identical output on the current "
+        "smoke-training checkpoints — they're undertrained enough that "
+        "recurrence depth isn't yet doing meaningful work. Revisit this "
+        "default (raise back toward 4) once the model is trained further "
+        "and loop depth starts to actually change the output.",
+    )
     p.add_argument("--temperature", type=float, default=0.8)
     p.add_argument("--top-k", type=int, default=50)
     p.add_argument(

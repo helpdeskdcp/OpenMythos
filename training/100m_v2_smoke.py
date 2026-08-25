@@ -62,6 +62,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--train-tokens", type=int, default=400_000)
     p.add_argument("--log-every", type=int, default=25)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--gen-prompt",
+        default="In the field of artificial intelligence research, recurrent-depth transformers",
+    )
+    p.add_argument("--gen-max-new-tokens", type=int, default=60)
+    p.add_argument("--save-checkpoint", default="")
     return p.parse_args()
 
 
@@ -121,6 +127,27 @@ def main() -> None:
     print(f"\n[done] wall={total_wall:.1f}s  initial_loss(avg first 10)={initial:.4f}  "
           f"final_loss(avg last 10)={final:.4f}  delta={final - initial:+.4f}")
     print(f"[done] no NaN/crash across {args.steps} steps: OK")
+
+    if args.save_checkpoint:
+        torch.save(model.state_dict(), args.save_checkpoint)
+        print(f"[done] saved checkpoint -> {args.save_checkpoint}")
+
+    # ---- post-training generation check ----
+    model.eval()
+    ids = tokenizer.encode(args.gen_prompt)
+    input_ids = torch.tensor([ids])
+    torch.manual_seed(args.seed)
+    out = model.generate(
+        input_ids,
+        max_new_tokens=args.gen_max_new_tokens,
+        n_loops=cfg.max_loop_iters,
+        temperature=0.8,
+        top_k=50,
+    )
+    gen_ids = out[0, len(ids):].tolist()
+    print(f"\n[gen] prompt={args.gen_prompt!r}")
+    print(f"[gen] continuation={tokenizer.decode(gen_ids)!r}")
+    print(f"[gen] any NaN token id: {any(t != t for t in gen_ids)}")
 
 
 if __name__ == "__main__":

@@ -36,6 +36,46 @@ def mythos_100m() -> MythosConfig:
     )
 
 
+def mythos_100m_v2() -> MythosConfig:
+    """100M-class config, v2: same GQA skeleton as mythos_100m() but with a much
+    larger non-embedding core, for a *future* training run.
+
+    mythos_100m() spends 90.7% of its 112.9M params on the embed/head table
+    (vocab=199998) and only 9.3% (10.5M) on the actual transformer core — well
+    past the ~210M-token Chinchilla-optimal budget for that core size at the
+    checkpoint's 80k training steps, which is why generation drifts/repeats
+    rather than simply being undertrained. This variant keeps the same
+    tokenizer/vocab (openai/gpt-oss-20b, 199998) and GQA attention shape, but
+    grows n_experts 4→8 and expert_dim 256→4096, taking the non-embedding core
+    to 71.1M params (41% of a 173.5M total) — closer parity with the embedding
+    table so the model has meaningfully more room to actually model language
+    rather than mostly memorizing a large multilingual vocabulary.
+
+    NOT compatible with the released mythos_100m_mixed_80k.pt checkpoint (MoE
+    expert tensor shapes differ) — this is a config for training a new
+    checkpoint from scratch, not a loader-compatible drop-in replacement.
+    """
+    return MythosConfig(
+        vocab_size=199998,
+        dim=512,
+        n_heads=8,
+        n_kv_heads=4,
+        max_seq_len=256,
+        max_loop_iters=4,
+        prelude_layers=2,
+        coda_layers=2,
+        attn_type="gqa",
+        qk_rope_head_dim=32,
+        n_experts=8,
+        n_shared_experts=1,
+        n_experts_per_tok=2,
+        expert_dim=4096,
+        act_threshold=0.99,
+        rope_theta=500000.0,
+        lora_rank=8,
+    )
+
+
 def mythos_1b() -> MythosConfig:
     """1B parameter config. Small research/fine-tuning model. dim=2048, 64 experts, 16 loop iters, 4k context."""
     return MythosConfig(

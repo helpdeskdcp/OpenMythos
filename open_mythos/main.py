@@ -1077,11 +1077,17 @@ class OpenMythos(nn.Module):
             logits = self.forward(
                 cur_ids, n_loops=n_loops, kv_cache=kv_cache, start_pos=start_pos
             )
-            logits = logits[:, -1, :] / temperature
-            if top_k > 0:
-                v, _ = logits.topk(top_k)
-                logits[logits < v[:, -1:]] = float("-inf")
-            probs = F.softmax(logits, dim=-1)
-            next_tok = torch.multinomial(probs, num_samples=1)
+            logits = logits[:, -1, :]
+            if temperature <= 0.0:
+                # Greedy decoding: dividing by temperature=0 would produce
+                # inf/nan logits and crash multinomial, so take argmax directly.
+                next_tok = logits.argmax(dim=-1, keepdim=True)
+            else:
+                logits = logits / temperature
+                if top_k > 0:
+                    v, _ = logits.topk(top_k)
+                    logits[logits < v[:, -1:]] = float("-inf")
+                probs = F.softmax(logits, dim=-1)
+                next_tok = torch.multinomial(probs, num_samples=1)
             input_ids = torch.cat([input_ids, next_tok], dim=1)
         return input_ids

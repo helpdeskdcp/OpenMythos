@@ -73,6 +73,13 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="load this state_dict before training (continue a previous smoke run)",
     )
+    p.add_argument(
+        "--optimizer",
+        choices=["adamw", "sgd"],
+        default="adamw",
+        help="sgd halves optimizer-state memory vs. adamw (1 momentum buffer "
+        "instead of 2) — useful on memory-constrained hosts",
+    )
     return p.parse_args()
 
 
@@ -103,7 +110,11 @@ def main() -> None:
         model.load_state_dict(state, strict=True)
         print(f"[setup] resumed weights from {args.resume_checkpoint}")
 
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
+    if args.optimizer == "sgd":
+        opt = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.1)
+    else:
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
+    print(f"[setup] optimizer={args.optimizer}")
 
     losses: list[float] = []
     data_iter = iter(loader)
